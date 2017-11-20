@@ -46,6 +46,7 @@ namespace BrowserEfficiencyTest
                     scenarioRunner.Run();
                 }
 
+#if (!ADK)
                 // If traces have been written, process them into a csv of results
                 // Only necessary if we're tracing and/or measuring responsiveness
                 if ((arguments.UsingTraceController && arguments.DoPostProcessing) || arguments.MeasureResponsiveness)
@@ -53,6 +54,7 @@ namespace BrowserEfficiencyTest
                     PerfProcessor perfProcessor = new PerfProcessor((arguments.SelectedMeasureSets).ToList());
                     perfProcessor.Execute(arguments.EtlPath, arguments.EtlPath, scenarioRunner.GetResponsivenessResults(), ScenarioRunner._extensionsNameAndVersion);
                 }
+#endif
             }
             else
             {

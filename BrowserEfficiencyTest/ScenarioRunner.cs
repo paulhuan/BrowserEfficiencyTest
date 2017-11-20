@@ -25,7 +25,9 @@
 //
 //--------------------------------------------------------------
 
+#if (!ADK)
 using Elevator;
+#endif
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -53,7 +55,9 @@ namespace BrowserEfficiencyTest
         private int _iterations;
         private int _maxAttempts;
         private string _browserProfilePath;
+#if (!ADK)
         private bool _usingTraceController;
+#endif
         private string _etlPath;
         private List<string> _extensionsPaths;
         private string _extensionsStagingPath;
@@ -62,9 +66,11 @@ namespace BrowserEfficiencyTest
         private List<string> _browsers = new List<string>();
         private CredentialManager _logins;
         private string _workloadName;
+#if (!ADK)
         private int _e3RefreshDelaySeconds;
         private bool _captureBaseline;
         private int _baselineCaptureSeconds;
+#endif
         private bool _clearBrowserCache;
         private bool _executeWarmupRun;
         private string _hostName;
@@ -72,8 +78,10 @@ namespace BrowserEfficiencyTest
         private bool _enableVerboseLogging;
         private bool _enableScenarioTracing;
 
+#if (!ADK)
         // _measureSets format: Dictionary< "measure set name", Tuple < "WPR profile name", "tracing mode" >>
         private Dictionary<string, Tuple<string, string>> _measureSets;
+#endif
 
         /// <summary>
         /// Instantiates a ScenarioRunner with the passed in arguments
@@ -81,10 +89,14 @@ namespace BrowserEfficiencyTest
         /// <param name="args"></param>
         public ScenarioRunner(Arguments args)
         {
+#if (!ADK)
             _e3RefreshDelaySeconds = 12;
+#endif
             _iterations = args.Iterations;
             _browserProfilePath = args.BrowserProfilePath;
+#if (!ADK)
             _usingTraceController = args.UsingTraceController;
+#endif
             _etlPath = args.EtlPath;
             _extensionsStagingPath = "";
             _maxAttempts = args.MaxAttempts;
@@ -92,11 +104,15 @@ namespace BrowserEfficiencyTest
             _scenarios = args.Scenarios.ToList();
             _browsers = args.Browsers.ToList();
             _workloadName = args.ScenarioName;
+#if (!ADK)
             _measureSets = GetMeasureSetInfo(args.SelectedMeasureSets.ToList());
+#endif
             _logins = new CredentialManager(args.CredentialPath);
             _timer = new ResponsivenessTimer();
+#if (!ADK)
             _captureBaseline = args.CaptureBaseline;
             _baselineCaptureSeconds = args.BaselineCaptureSeconds;
+#endif
             _clearBrowserCache = args.ClearBrowserCache;
             _executeWarmupRun = args.DoWarmupRun;
             _hostName = args.Host;
@@ -250,6 +266,7 @@ namespace BrowserEfficiencyTest
             }
         }
 
+#if (!ADK)
         // Creates a data structure of measure sets name, wprp file and tracing mode and creates an empty one
         // if there are no measure sets selected (user isn't doing any tracing). This helps to simplify the 
         // logic needed to allow both the ability to cycle through measure sets if the user selected any as
@@ -278,6 +295,7 @@ namespace BrowserEfficiencyTest
 
             return measureSetInfo;
         }
+#endif
 
         public List<string> GetResponsivenessResults()
         {
@@ -299,12 +317,18 @@ namespace BrowserEfficiencyTest
                 ScenarioEventSourceProvider.EventLog.WarmupExecutionStart();
                 foreach (string browser in _browsers)
                 {
+#if (!ADK)
                     // Even though we are not collecting any tracing during warmup runs, we need to pass a dummy ElevatorClient to the ExecuteWorkload function.
                     using (var elevatorClient = ElevatorClient.Create(false))
+#endif
                     {
                         Logger.LogWriteLine(string.Format(" Executing warmup of {0} browser", browser));
                         // use -1 as the iteration value to denote warmup run
+#if ADK
+                        ExecuteWorkload(-1, browser, true);
+#else
                         ExecuteWorkload(-1, browser, "None", "", "", true, false, elevatorClient);
+#endif
                         Logger.LogWriteLine(string.Format(" Completed warmup of {0} browser", browser));
                     }
                 }
@@ -317,6 +341,7 @@ namespace BrowserEfficiencyTest
                 _timer.Enable();
             }
 
+#if (!ADK)
             if (_usingTraceController)
             {
                 Logger.LogWriteLine("Pausing before starting first tracing session to reduce interference.");
@@ -325,11 +350,16 @@ namespace BrowserEfficiencyTest
                 // that the browser energy data reported by E3 going forward is from this test run and not from before running the test pass.
                 Thread.Sleep(_e3RefreshDelaySeconds * 1000);
             }
+#endif
 
+#if (!ADK)
             using (var elevatorClient = ElevatorClient.Create(_usingTraceController))
+#endif
             {
+#if (!ADK)
                 elevatorClient.ConnectAsync().Wait();
                 elevatorClient.SendControllerMessageAsync($"{Elevator.Commands.START_PASS} {_etlPath}").Wait();
+#endif
                 Logger.LogWriteLine("Starting Test Pass");
 
                 // Core Execution Loop
@@ -338,8 +368,11 @@ namespace BrowserEfficiencyTest
                 {
                     Logger.LogWriteLine(string.Format("Iteration: {0} ------------------", iteration));
                     _timer.SetIteration(iteration);
+#if (!ADK)
                     foreach (var currentMeasureSet in _measureSets)
+#endif
                     {
+#if (!ADK)
                         if (_captureBaseline && _usingTraceController)
                         {
                             // capture a baseline of the system for this measureset
@@ -370,6 +403,7 @@ namespace BrowserEfficiencyTest
                         }
 
                         _timer.SetMeasureSet(currentMeasureSet.Key);
+#endif
 
                         // Randomize the order the browsers each iteration to reduce systematic bias in the test
                         Random rand = new Random();
@@ -379,20 +413,30 @@ namespace BrowserEfficiencyTest
                         {
                             _timer.SetBrowser(browser, _extensionsNameAndVersion);
 
+#if ADK
+                            passSucceeded = ExecuteWorkload(iteration, browser, _overrideTimeout);
+#else
                             passSucceeded = ExecuteWorkload(iteration, browser, currentMeasureSet.Key, currentMeasureSet.Value.Item1, currentMeasureSet.Value.Item2, _overrideTimeout, _usingTraceController, elevatorClient);
+#endif
                         }
                     }
                 }
 
                 CleanupExtensions();
                 Logger.LogWriteLine("Completed Test Pass");
+#if (!ADK)
                 elevatorClient.SendControllerMessageAsync(Elevator.Commands.END_PASS).Wait();
+#endif
             }
         }
 
         // This method is the one actually responsible for executing each scenario in the workload
         // It includes error checking and retry attempts as well as controls for starting and stopping ETL tracing via ElevatorServer.exe
+#if ADK
+        private bool ExecuteWorkload(int iteration, string browser, bool overrideTimeout)
+#else
         private bool ExecuteWorkload(int iteration, string browser, string measureSetName, string wprProfileName, string tracingMode, bool overrideTimeout, bool usingTraceController, IElevatorClient elevatorClient)
+#endif
         {
             bool passSucceeded = false;
 
@@ -413,6 +457,7 @@ namespace BrowserEfficiencyTest
                     workloadName = _workloadName + "-0-" + _scenarios[0].ScenarioName;
                 }
 
+#if (!ADK)
                 // Start tracing
                 elevatorClient.SendControllerMessageAsync($"{Elevator.Commands.START_BROWSER} {browser} ITERATION {iteration} SCENARIO_NAME {workloadName} WPRPROFILE {wprProfileName} MODE {tracingMode}").Wait();
 
@@ -424,9 +469,14 @@ namespace BrowserEfficiencyTest
                     // that the browser energy data reported by E3 for this run is only for this run and does not bleed into any other runs.
                     Thread.Sleep(_e3RefreshDelaySeconds * 1000);
                 }
+#endif
 
                 Logger.LogWriteLine(string.Format(" Launching Browser Driver: '{0}'", browser));
+#if ADK
+                ScenarioEventSourceProvider.EventLog.WorkloadStart(_workloadName, browser, iteration, attemptNumber);
+#else
                 ScenarioEventSourceProvider.EventLog.WorkloadStart(_workloadName, browser, wprProfileName, iteration, attemptNumber);
+#endif
 
                 using (var driver = RemoteWebDriverExtension.CreateDriverAndMaximize(browser, _clearBrowserCache, _enableVerboseLogging, _browserProfilePath, _extensionsPaths, _port, _hostName))
                 {
@@ -442,9 +492,11 @@ namespace BrowserEfficiencyTest
                         {
                             if (_enableScenarioTracing && scenarioIndex > 0)
                             {
+#if (!ADK)
                                 // Capturing a trace per each scenario of the workload. 
                                 // Stop and save the current trace session which is for the last scenario.
                                 elevatorClient.SendControllerMessageAsync($"{Elevator.Commands.END_BROWSER} {browser}").Wait();
+#endif
                                 
                                 // let's just wait a few seconds before starting the next trace
                                 Thread.Sleep(3000); 
@@ -452,8 +504,10 @@ namespace BrowserEfficiencyTest
                                 // Append the scenario name and index to the workloadname for documentation purposes.
                                 workloadName = _workloadName + "-" + scenarioIndex + "-" + currentScenario.ScenarioName;
 
+#if (!ADK)
                                 // Start tracing for the current scenario
                                 elevatorClient.SendControllerMessageAsync($"{Elevator.Commands.START_BROWSER} {browser} ITERATION {iteration} SCENARIO_NAME {workloadName} WPRPROFILE {wprProfileName} MODE {tracingMode}").Wait();
+#endif
                             }
 
                             // Save the name of the current scenarion in case an exception is thrown in which case the local variable 'currentScenario' will be lost
@@ -476,7 +530,11 @@ namespace BrowserEfficiencyTest
 
                             isFirstScenario = false;
 
+#if ADK
+                            Logger.LogWriteLine(string.Format("  Executing - Scenario: {0}  Iteration: {1}  Attempt: {2}  Browser: {3}", currentScenario.ScenarioName, iteration, attemptNumber, browser));
+#else
                             Logger.LogWriteLine(string.Format("  Executing - Scenario: {0}  Iteration: {1}  Attempt: {2}  Browser: {3}  MeasureSet: {4}", currentScenario.ScenarioName, iteration, attemptNumber, browser, measureSetName));
+#endif
                             ScenarioEventSourceProvider.EventLog.ScenarioExecutionStart(browser, currentScenario.ScenarioName);
 
                             // Here, control is handed to the scenario to navigate, and do whatever it wants
@@ -503,26 +561,41 @@ namespace BrowserEfficiencyTest
                             }
 
                             ScenarioEventSourceProvider.EventLog.ScenarioExecutionStop(browser, currentScenario.ScenarioName);
+#if ADK
+                            Logger.LogWriteLine(string.Format("  Completed - Scenario: {0}  Iteration: {1}  Attempt: {2}  Browser: {3}", currentScenario.ScenarioName, iteration, attemptNumber, browser, runTime.TotalSeconds));
+#else
                             Logger.LogWriteLine(string.Format("  Completed - Scenario: {0}  Iteration: {1}  Attempt: {2}  Browser: {3}  MeasureSet: {4}", currentScenario.ScenarioName, iteration, attemptNumber, browser, measureSetName, runTime.TotalSeconds));
+#endif
                             scenarioIndex++;
                         }
 
                         driver.CloseBrowser(browser);
                         passSucceeded = true;
 
+#if ADK
+                        Logger.LogWriteLine(string.Format(" SUCCESS!  Completed Browser: {0}  Iteration: {1}  Attempt: {2}", browser, iteration, attemptNumber));
+                        ScenarioEventSourceProvider.EventLog.WorkloadStop(_workloadName, browser, iteration, attemptNumber);
+#else
                         Logger.LogWriteLine(string.Format(" SUCCESS!  Completed Browser: {0}  Iteration: {1}  Attempt: {2}  MeasureSet: {3}", browser, iteration, attemptNumber, measureSetName));
                         ScenarioEventSourceProvider.EventLog.WorkloadStop(_workloadName, browser, wprProfileName, iteration, attemptNumber);
+#endif
                     }
                     catch (Exception ex)
                     {
+#if (!ADK)
                         // If something goes wrong and we get an exception halfway through the scenario, we clean up
                         // and put everything back into a state where we can start the next iteration.
                         elevatorClient.SendControllerMessageAsync(Elevator.Commands.CANCEL_PASS);
+#endif
 
                         try
                         {
                             // Attempt to save the page source
+#if ADK
+                            string pageSourceFileName = string.Format("pageSource_{0}_{1}_{2}_{3}.html", browser, currentScenarioName, iteration, attemptNumber);
+#else
                             string pageSourceFileName = string.Format("pageSource_{0}_{1}_{2}_{3}_{4}.html", browser, currentScenarioName, iteration, measureSetName, attemptNumber);
+#endif
                             pageSourceFileName = Path.Combine(_etlPath, pageSourceFileName);
                             using (StreamWriter sw = new StreamWriter(pageSourceFileName, false))
                             {
@@ -531,7 +604,11 @@ namespace BrowserEfficiencyTest
 
                             // Attempt to save a screenshot
                             OpenQA.Selenium.Screenshot screenshot = driver.GetScreenshot();
+#if ADK
+                            string imageFileName = string.Format("screenshot_{0}_{1}_{2}_{3}.png", browser, currentScenarioName, iteration, attemptNumber);
+#else
                             string imageFileName = string.Format("screenshot_{0}_{1}_{2}_{3}_{4}.png", browser, currentScenarioName, iteration, measureSetName, attemptNumber);
+#endif
                             imageFileName = Path.Combine(_etlPath, imageFileName);
                             screenshot.SaveAsFile(imageFileName, OpenQA.Selenium.ScreenshotImageFormat.Png);
                         }
@@ -543,21 +620,26 @@ namespace BrowserEfficiencyTest
                         driver.CloseBrowser(browser);
                         Logger.LogWriteLine("------ EXCEPTION caught while trying to run scenario! ------------------------------------");
                         Logger.LogWriteLine(string.Format("    Iteration:   {0}", iteration));
+#if (!ADK)
                         Logger.LogWriteLine(string.Format("    Measure Set: {0}", measureSetName));
+#endif
                         Logger.LogWriteLine(string.Format("    Browser:     {0}", browser));
                         Logger.LogWriteLine(string.Format("    Attempt:     {0}", attemptNumber));
                         Logger.LogWriteLine(string.Format("    Scenario:    {0}", currentScenarioName));
                         Logger.LogWriteLine("    Exception:   " + ex.ToString());
 
+#if (!ADK)
                         if (usingTraceController)
                         {
                             Logger.LogWriteLine("   Trace has been discarded");
                         }
+#endif
 
                         Logger.LogWriteLine("-------------------------------------------------------");
                     }
                     finally
                     {
+#if (!ADK)
                         if (usingTraceController)
                         {
                             Logger.LogWriteLine(string.Format("  Pausing {0} seconds before stopping the trace session to reduce interference.", _e3RefreshDelaySeconds));
@@ -566,14 +648,17 @@ namespace BrowserEfficiencyTest
                             // that the browser energy data reported by E3 for this run is only for this run and does not bleed into any other runs.
                             Thread.Sleep(_e3RefreshDelaySeconds * 1000);
                         }
+#endif
                     }
                 }
             }
 
             if (passSucceeded)
             {
+#if (!ADK)
                 // Stop tracing
                 elevatorClient.SendControllerMessageAsync($"{Elevator.Commands.END_BROWSER} {browser}").Wait();
+#endif
             }
             else
             {

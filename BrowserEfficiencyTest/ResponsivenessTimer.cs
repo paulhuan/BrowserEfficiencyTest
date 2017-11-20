@@ -21,7 +21,9 @@ namespace BrowserEfficiencyTest
         private string _currentSceanrio;
         private int _iteration;
         private string _browser;
+#if (!ADK)
         private string _measureSet;
+#endif
         private RemoteWebDriver _driver;
         private bool _enabled;
 
@@ -61,6 +63,7 @@ namespace BrowserEfficiencyTest
             }
         }
 
+#if (!ADK)
         /// <summary>
         /// Sets the measureSet, which will be included when a measurement is recorded later.
         /// </summary>
@@ -69,6 +72,7 @@ namespace BrowserEfficiencyTest
         {
             _measureSet = measureSet;
         }
+#endif
 
         /// <summary>
         /// Sets the sceanrio, which will be included when a measurement is recorded later.
@@ -157,7 +161,9 @@ namespace BrowserEfficiencyTest
             record.Add(_browser);
             record.Add(now.ToString("yyyyMMdd"));
             record.Add(now.ToString("HHmmss"));
+#if (!ADK)
             record.Add("responsiveness (" + _measureSet + ")");
+#endif
             record.Add(measure);
             record.Add(result);
             _results.Add(record);

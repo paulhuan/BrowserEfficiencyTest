@@ -44,8 +44,10 @@ namespace BrowserEfficiencyTest
         private Dictionary<string, WorkloadScenario> _possibleScenarios;
         private List<WorkloadScenario> _scenarios;
         private List<string> _browsers;
+#if (!ADK)
         private Dictionary<string, MeasureSet> _availableMeasureSets;
         private List<MeasureSet> _selectedMeasureSets;
+#endif
         private List<Workload> _workloads;
 
         public string ScenarioName { get; private set; }
@@ -56,12 +58,16 @@ namespace BrowserEfficiencyTest
         public string ExtensionsPath { get; private set; }
         public int MaxAttempts { get; private set; }
         public bool OverrideTimeout { get; private set;  }
+#if (!ADK)
         public bool DoPostProcessing { get; private set; }
+#endif
         public string CredentialPath { get; private set; }
         public bool MeasureResponsiveness { get; private set; }
         public bool ArgumentsAreValid { get; private set; }
         public string BrowserEfficiencyTestVersion { get; private set; }
+#if (!ADK)
         public bool CaptureBaseline { get; private set; }
+#endif
         public int BaselineCaptureSeconds { get; private set; }
         public bool ClearBrowserCache { get; private set; }
         public bool DoWarmupRun { get; private set; }
@@ -87,6 +93,7 @@ namespace BrowserEfficiencyTest
             get { return _browsers.AsReadOnly(); }
         }
 
+#if (!ADK)
         /// <summary>
         /// List of all measure sets selected to be run.
         /// </summary>
@@ -94,6 +101,7 @@ namespace BrowserEfficiencyTest
         {
             get { return _selectedMeasureSets.AsReadOnly(); }
         }
+#endif
 
         /// <summary>
         /// Initializes a new instance of the Arguments class and processes the passed in array of command line arguments.
@@ -108,8 +116,10 @@ namespace BrowserEfficiencyTest
             _possibleScenarios = new Dictionary<string, WorkloadScenario>();
             _scenarios = new List<WorkloadScenario>();
             _browsers = new List<string>();
+#if (!ADK)
             _availableMeasureSets = PerfProcessor.AvailableMeasureSets.ToDictionary(k => k.Key.ToLowerInvariant(), v => v.Value);
             _selectedMeasureSets = new List<MeasureSet>();
+#endif
             _workloads = new List<Workload>();
 
             ScenarioName = "";
@@ -120,11 +130,15 @@ namespace BrowserEfficiencyTest
             ExtensionsPath = "";
             MaxAttempts = 3;
             OverrideTimeout = false;
+#if (!ADK)
             DoPostProcessing = true;
+#endif
             CredentialPath = "credentials.json";
             MeasureResponsiveness = false;
             BrowserEfficiencyTestVersion = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+#if (!ADK)
             CaptureBaseline = false;
+#endif
             BaselineCaptureSeconds = 600; // 10 minutes as the default
             ClearBrowserCache = false;
             DoWarmupRun = false;
@@ -269,6 +283,7 @@ namespace BrowserEfficiencyTest
                         }
 
                         break;
+#if (!ADK)
                     case "-resultspath":
                     case "-rp":
                         // A valid path must be specified after the -rp|-resultspath option.
@@ -293,6 +308,7 @@ namespace BrowserEfficiencyTest
                         }
 
                         break;
+#endif
                     case "-extensions":
                     case "-e":
                         foreach (var browser in _browsers)
@@ -329,6 +345,7 @@ namespace BrowserEfficiencyTest
                         }
 
                         break;
+#if (!ADK)
                     case "-measureset":
                     case "-ms":
                         // One or more measuresets must be specified after the -ms|-measureset option.
@@ -361,6 +378,7 @@ namespace BrowserEfficiencyTest
                         }
 
                         break;
+#endif
                     case "-iterations":
                     case "-i":
                         // An integer value greater than 0 must be specified after the -i|-iterations option.
@@ -428,10 +446,12 @@ namespace BrowserEfficiencyTest
                     case "-notimeout":
                         OverrideTimeout = true;
                         break;
+#if (!ADK)
                     case "-noprocessing":
                     case "-np":
                         DoPostProcessing = false;
                         break;
+#endif
                     case "-credentialpath":
                     case "-cp":
                         // An existing credential file must be passed after the -cp|-credentialpath option.
@@ -478,6 +498,7 @@ namespace BrowserEfficiencyTest
                         Logger.SetupFileLogging(logPath);
                         Logger.LogWriteLine("Arguments: " + string.Join(" ", args), false);
                         break;
+#if (!ADK)
                     case "-capturebaseline":
                     case "-cb":
                         // Enable capturing an ETL of the system doing nothing as the system baseline.
@@ -507,6 +528,7 @@ namespace BrowserEfficiencyTest
                             Logger.LogWriteLine("Invalid value for the baseline capture time in seconds. Must be an integer greater than 0 and less than 36000.", false);
                         }
                         break;
+#endif
                     case "-clearbrowsercache":
                     case "-cbc":
                         ClearBrowserCache = true;
@@ -595,6 +617,7 @@ namespace BrowserEfficiencyTest
                 Logger.LogWriteLine("If you wish to only run the performance processor then omit the browser and scenario/workload arguments and specify a measureset.", false);
             }
 
+#if (!ADK)
             // If a user specifies a region of interest and a measureset then assign that region of interest to each selected measureset
             if (argumentsAreValid && RegionOfInterest != "" && UsingTraceController)
             {
@@ -603,6 +626,7 @@ namespace BrowserEfficiencyTest
                     measureSet.WpaRegionName = RegionOfInterest;
                 }
             }
+#endif
 
             Logger.LogWriteLine(string.Format("BrowserEfficiencyTest Version: {0}", BrowserEfficiencyTestVersion), false);
 
@@ -612,7 +636,9 @@ namespace BrowserEfficiencyTest
                 DisplayUsage();
                 DisplayAvailableScenarios();
                 DisplayAvailableWorkloads();
+#if (!ADK)
                 DisplayAvailableMeasureSets();
+#endif
             }
 
             return argumentsAreValid;
@@ -626,17 +652,23 @@ namespace BrowserEfficiencyTest
                                 + "[-browser|-b [chrome|edge|firefox|opera|operabeta] "
                                 + "[-scenario|-s <scenario1> <scenario2>] "
                                 + "[-iterations|-i <iterationcount>] "
+#if (!ADK)
                                 + "[-resultspath|-rp <etlpath>] "
                                 + "[-measureset|-ms <measureset1> <measureset2>] "
+#endif
                                 + "[-profile|-p <chrome profile path>] "
                                 + "[-attempts|-a <attempts to make per iteration>] "
                                 + "[-notimeout] "
+#if (!ADK)
                                 + "[-noprocessing|-np] "
+#endif
                                 + "[-workload|-w <workload name>] "
                                 + "[-credentialpath|-cp <path to credentials json file>] "
                                 + "[-responsiveness|-r] "
                                 + "[-filelogging|-fl [<path for logfile>]] "
+#if (!ADK)
                                 + "[-capturebaseline|-cb <integer representing number of seconds>] "
+#endif
                                 + "[-extensions|-e <path to directory containing unpacked extension AppX(s)>] "
                                 + "[-clearbrowsercache|-cbc] "
                                 + "[-warmuprun|-wu] "
@@ -670,6 +702,7 @@ namespace BrowserEfficiencyTest
             }
         }
 
+#if (!ADK)
         // Output all the available measuresets.
         private void DisplayAvailableMeasureSets()
         {
@@ -679,6 +712,7 @@ namespace BrowserEfficiencyTest
                 Logger.LogWriteLine(measureSet.Key.ToString(), false);
             }
         }
+#endif
 
         /// <summary>
         /// All scenarios must be instantiated and added to the list of possible scenarios in this method.

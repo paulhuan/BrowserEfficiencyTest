@@ -60,10 +60,18 @@ namespace BrowserEfficiencyTest
 
         // Basic events - Events for basic test operations are covered by these such as starting and ending of a scenario
         [Event(1, Opcode = EventOpcode.Start, Task = Tasks.WorkloadExecution)]
+#if ADK
+        public void WorkloadStart(string Workload, string Browser, int Iteration, int Attempt) { WriteEvent(1, Workload, Browser, Iteration, Attempt); }
+#else
         public void WorkloadStart(string Workload, string Browser, string WprProfile, int Iteration, int Attempt) { WriteEvent(1, Workload, Browser, WprProfile, Iteration, Attempt); }
+#endif
 
         [Event(2, Opcode = EventOpcode.Stop, Task = Tasks.WorkloadExecution)]
+#if ADK
+        public void WorkloadStop(string Workload, string Browser, int Iteration, int Attempt) { WriteEvent(2, Workload, Browser, Iteration, Attempt); }
+#else
         public void WorkloadStop(string Workload, string Browser, string WprProfile, int Iteration, int Attempt) { WriteEvent(2, Workload, Browser, WprProfile, Iteration, Attempt); }
+#endif
 
         [Event(3, Opcode = EventOpcode.Start, Task = Tasks.ScenarioExecution)]
         public void ScenarioExecutionStart(string Browser, string ScenarioName) { WriteEvent(3, Browser, ScenarioName); }
